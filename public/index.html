@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Video Call App</title>
+  </head>
+  <body>
+    <div class="row">
+      <div class="col">
+        <video id="localVideo" autoplay muted></video>
+      </div>
+      <div class="col">
+        <video id="remoteVideo" autoplay></video>
+      </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io.connect("http://localhost:3000");
+
+      const configuration = {
+        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+      };
+      const peerConnection = new RTCPeerConnection(configuration);
+
+      // Handle the creation of the offer
+      peerConnection
+        .createOffer()
+        .then((offer) => peerConnection.setLocalDescription(offer))
+        .then(() => {
+          socket.emit("offer", peerConnection.localDescription);
+        });
+
+      // When received, set the remote session description
+      socket.on("offer", (offer) => {
+        peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+
+        // Create an answer
+        peerConnection
+          .createAnswer()
+          .then((answer) => peerConnection.setLocalDescription(answer))
+          .then(() => {
+            socket.emit("answer", peerConnection.localDescription);
+          });
+      });
+
+      // When received, set the remote session description
+      socket.on("answer", (answer) => {
+        peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+      });
+
+      // When ICE Candidate is received
+      socket.on("ice-candidate", (iceCandidate) => {
+        const candidate = new RTCIceCandidate(iceCandidate);
+        peerConnection.addIceCandidate(candidate);
+      });
+
+      // Handle ICE Candidate events
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.emit("ice-candidate", event.candidate);
+        }
+      };
+
+      // Stream video
+      navigator.mediaDevices
+        .getUserMedia({ video: true, audio: true })
+        .then((stream) => {
+          const localVideo = document.getElementById("localVideo");
+          if (localVideo) {
+            localVideo.srcObject = stream;
+          }
+
+          // Add the stream to the peer connection
+          stream.getTracks().forEach((track) => {
+            peerConnection.addTrack(track, stream);
+          });
+        });
+
+      peerConnection.ontrack = (event) => {
+        const remoteVideo = document.getElementById("remoteVideo");
+        if (remoteVideo) {
+          remoteVideo.srcObject = event.streams[0];
+        }
+      };
+    </script>
+  </body>
+</html>
