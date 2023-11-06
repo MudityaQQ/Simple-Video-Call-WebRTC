@@ -9,17 +9,23 @@ const io = new Server(server);
 app.use(express.static('public'));
 
 
+
+
 io.on('connection', (socket) => {
-    socket.on('offer', (data) => {
-        socket.broadcast.emit('offer', data);
+    socket.on('join-room', (roomName) => {
+        socket.join(roomName);
     });
 
-    socket.on('answer', (data) => {
-        socket.broadcast.emit('answer', data);
+    socket.on('offer', (data, roomName) => {
+        socket.to(roomName).emit('offer', data);
     });
 
-    socket.on('ice-candidate', (data) => {
-        socket.broadcast.emit('ice-candidate', data);
+    socket.on('answer', (data, roomName) => {
+        socket.to(roomName).emit('answer', data);
+    });
+
+    socket.on('ice-candidate', (data, roomName) => {
+        socket.to(roomName).emit('ice-candidate', data);
     });
 });
 
